@@ -23,13 +23,14 @@ def get_available_balance():
     return float(profile_data['cash'])
 
 # Ask GPT for trading decision
-def ask_chatgpt(stock_symbol, current_price, moving_average, sentiment):
+def ask_chatgpt(stock_symbol, current_price, moving_average, sentiment, purchase_price):
     prompt = f"""
     Analyze the following stock data and suggest whether to buy, sell, or hold.
     Stock: {stock_symbol}
     Current Price: ${current_price}
     Moving Average (10 days): ${moving_average}
     Market Sentiment: {sentiment}
+    Purchase Price: ${purchase_price}
     Provide a decision with reasoning.
     """
 
@@ -47,7 +48,7 @@ def get_market_sentiment(stock_symbol):
     return "positive"  # Replace with actual sentiment analysis
 
 # Moving average strategy
-def moving_average_strategy(stock_symbol):
+def moving_average_strategy(stock_symbol, purchase_price):
     # Fetch historical stock data for last 10 days
     historicals = r.stocks.get_stock_historicals(stock_symbol, interval='day', span='month')
     closing_prices = [float(day['close_price']) for day in historicals[-10:]]
@@ -60,12 +61,12 @@ def moving_average_strategy(stock_symbol):
     sentiment = get_market_sentiment(stock_symbol)
 
     # Ask GPT for trade decision
-    gpt_decision = ask_chatgpt(stock_symbol, current_price, moving_average, sentiment)
+    gpt_decision = ask_chatgpt(stock_symbol, current_price, moving_average, sentiment, purchase_price)
     return gpt_decision, current_price
 
 # Trade stock based on available balance using fractional shares
-def trade_stock(stock_symbol, available_balance, allocation_fraction=0.05):
-    decision, current_price = moving_average_strategy(stock_symbol)
+def trade_stock(stock_symbol, available_balance, purchase_price, allocation_fraction=0.05):
+    decision, current_price = moving_average_strategy(stock_symbol, purchase_price)
     
     # Determine how much of the balance to allocate for this stock (e.g., 5% of available balance)
     allocation_amount = available_balance * allocation_fraction
@@ -101,7 +102,7 @@ def trade_stock(stock_symbol, available_balance, allocation_fraction=0.05):
 
     return 0
 
-# Fetch current holdings and exclude VOO and S&P 500 stocks
+# Fetch current holdings, including purchase price, and exclude VOO and S&P 500 stocks
 def get_filtered_holdings():
     # Fetch current positions from Robinhood
     holdings = r.account.build_holdings()
@@ -112,7 +113,10 @@ def get_filtered_holdings():
     # Filter out stocks that are in VOO or the S&P 500
     filtered_holdings = {symbol: details for symbol, details in holdings.items() if symbol not in s_and_p_500_symbols}
     
-    return list(filtered_holdings.keys())
+    # Extract holdings with average purchase price
+    holdings_with_purchase_price = {symbol: details['average_buy_price'] for symbol, details in filtered_holdings.items()}
+    
+    return holdings_with_purchase_price
 
 # Check if the market is open (9:30 AM to 4:00 PM Eastern Time)
 def is_market_open():
@@ -129,9 +133,9 @@ def run_bot():
     print(f"Initial account balance: ${initial_balance:.2f}")
 
     # Fetch the filtered holdings dynamically (excluding VOO and S&P 500)
-    filtered_holdings = get_filtered_holdings()
-    logging.info(f"Filtered holdings (excluding VOO and S&P 500): {filtered_holdings}")
-    print(f"Filtered holdings (excluding VOO and S&P 500): {filtered_holdings}")
+    filtered_holdings_with_prices = get_filtered_holdings()
+    logging.info(f"Filtered holdings (excluding VOO and S&P 500) with purchase prices: {filtered_holdings_with_prices}")
+    print(f"Filtered holdings (excluding VOO and S&P 500) with purchase prices: {filtered_holdings_with_prices}")
 
     # Set a loop limit for testing (for example, run for 3 cycles or you can modify this)
     cycles = 3
@@ -141,12 +145,12 @@ def run_bot():
 
             # Keep track of balance throughout the cycle
             total_spent = 0
-            for stock in filtered_holdings:
+            for stock, purchase_price in filtered_holdings_with_prices.items():
                 if available_balance <= 0:
                     logging.info("Insufficient funds, stopping trades.")
                     print("Insufficient funds, stopping trades.")
                     break
-                spent = trade_stock(stock, available_balance)
+                spent = trade_stock(stock, available_balance, float(purchase_price))
                 total_spent += spent  # Sum up all spending for the cycle
                 available_balance -= spent  # Update available balance for the next trade
 
