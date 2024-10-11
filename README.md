@@ -27,4 +27,5 @@ Before you can run the bot, you'll need:
 Install the required libraries using:
 
 ```bash
-pip install robin_stocks openai yfinance
+pip install robin_stocks openai yfinance pytz
+
