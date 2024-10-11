@@ -3,6 +3,8 @@ import openai
 import yfinance as yf
 import time
 import logging
+from datetime import datetime, timedelta
+import pytz  # To handle time zones
 
 # Robinhood Login
 robinhood_username = "your_robinhood_username"
@@ -114,48 +116,63 @@ def get_top_15_stocks():
     
     return top_15_stocks
 
-# Execute trades with dynamic top 15 stocks
-initial_balance = get_available_balance()
-logging.info(f"Initial account balance: ${initial_balance:.2f}")
-print(f"Initial account balance: ${initial_balance:.2f}")
+# Check if the market is open (9:30 AM to 4:00 PM Eastern Time)
+def is_market_open():
+    eastern = pytz.timezone('US/Eastern')
+    now = datetime.now(eastern)
+    market_open = now.replace(hour=9, minute=30, second=0, microsecond=0)
+    market_close = now.replace(hour=16, minute=0, second=0, microsecond=0)
+    return market_open <= now <= market_close
 
-# Fetch the top 15 stocks dynamically
-top_15_stocks = get_top_15_stocks()
-logging.info(f"Top 15 stocks by market cap: {top_15_stocks}")
-print(f"Top 15 stocks by market cap: {top_15_stocks}")
+# Execute trades only when the market is open
+def run_bot():
+    initial_balance = get_available_balance()
+    logging.info(f"Initial account balance: ${initial_balance:.2f}")
+    print(f"Initial account balance: ${initial_balance:.2f}")
 
-# Set a loop limit for testing (for example, run for 3 cycles or you can modify this)
-cycles = 3
-while cycles > 0:
-    available_balance = get_available_balance()
+    # Fetch the top 15 stocks dynamically
+    top_15_stocks = get_top_15_stocks()
+    logging.info(f"Top 15 stocks by market cap: {top_15_stocks}")
+    print(f"Top 15 stocks by market cap: {top_15_stocks}")
 
-    # Keep track of balance throughout the cycle
-    total_spent = 0
-    for stock in top_15_stocks:
-        if available_balance <= 0:
-            logging.info("Insufficient funds, stopping trades.")
-            print("Insufficient funds, stopping trades.")
-            break
-        spent = trade_stock(stock, available_balance)
-        total_spent += spent  # Sum up all spending for the cycle
-        available_balance -= spent  # Update available balance for the next trade
+    # Set a loop limit for testing (for example, run for 3 cycles or you can modify this)
+    cycles = 3
+    while cycles > 0:
+        if is_market_open():
+            available_balance = get_available_balance()
 
-    # Log and print the ending balance after each cycle
-    final_balance = get_available_balance()
-    logging.info(f"End of cycle. Current balance: ${final_balance:.2f}")
-    print(f"End of cycle. Current balance: ${final_balance:.2f}")
-    
-    # Reduce cycle count
-    cycles -= 1
+            # Keep track of balance throughout the cycle
+            total_spent = 0
+            for stock in top_15_stocks:
+                if available_balance <= 0:
+                    logging.info("Insufficient funds, stopping trades.")
+                    print("Insufficient funds, stopping trades.")
+                    break
+                spent = trade_stock(stock, available_balance)
+                total_spent += spent  # Sum up all spending for the cycle
+                available_balance -= spent  # Update available balance for the next trade
 
-    # Sleep for an hour before the next cycle (for testing, you can reduce this to a few seconds)
-    time.sleep(3600)
+            # Log and print the ending balance after each cycle
+            final_balance = get_available_balance()
+            logging.info(f"End of cycle. Current balance: ${final_balance:.2f}")
+            print(f"End of cycle. Current balance: ${final_balance:.2f}")
+            
+            # Reduce cycle count
+            cycles -= 1
 
-# Log and print final balance after all cycles are completed
-final_balance = get_available_balance()
-logging.info(f"Final account balance after all cycles: ${final_balance:.2f}")
-print(f"Final account balance after all cycles: ${final_balance:.2f}")
+            # Sleep for an hour before the next cycle (for testing, you can reduce this to a few seconds)
+            time.sleep(3600)
+        else:
+            print("Market is closed. Sleeping until market opens.")
+            time_to_market_open = (datetime.now().replace(hour=9, minute=30, second=0, microsecond=0) + timedelta(days=1)) - datetime.now()
+            time.sleep(time_to_market_open.total_seconds())
 
-# Print final report
-print(f"Started with: ${initial_balance:.2f}")
-print(f"Ended with: ${final_balance:.2f}")
+# Run the bot
+while True:
+    if is_market_open():
+        run_bot()
+    else:
+        print("Market is closed. Sleeping until market opens.")
+        # Sleep until the next market open (9:30 AM Eastern Time the next day)
+        time_to_market_open = (datetime.now().replace(hour=9, minute=30, second=0, microsecond=0) + timedelta(days=1)) - datetime.now()
+        time.sleep(time_to_market_open.total_seconds())
