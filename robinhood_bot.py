@@ -128,7 +128,7 @@ def is_market_open():
 
 # Execute trades only when the market is open
 def run_bot():
-    initial_balance = get_available_balance()
+    initial_balance = get_available_balance()  # Initial balance at the start of the day
     logging.info(f"Initial account balance: ${initial_balance:.2f}")
     print(f"Initial account balance: ${initial_balance:.2f}")
 
@@ -168,6 +168,18 @@ def run_bot():
             print("Market is closed. Sleeping until market opens.")
             time_to_market_open = (datetime.now().replace(hour=9, minute=30, second=0, microsecond=0) + timedelta(days=1)) - datetime.now()
             time.sleep(time_to_market_open.total_seconds())
+
+    # Final balance at the end of the day
+    final_balance = get_available_balance()
+    
+    # Calculate profit or loss
+    profit_or_loss = final_balance - initial_balance
+    if profit_or_loss >= 0:
+        print(f"Profit for the day: ${profit_or_loss:.2f}")
+        logging.info(f"Profit for the day: ${profit_or_loss:.2f}")
+    else:
+        print(f"Loss for the day: ${abs(profit_or_loss):.2f}")
+        logging.info(f"Loss for the day: ${abs(profit_or_loss):.2f}")
 
 # Run the bot
 while True:
