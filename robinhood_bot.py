@@ -101,20 +101,18 @@ def trade_stock(stock_symbol, available_balance, allocation_fraction=0.05):
 
     return 0
 
-# Fetch top 15 stocks by market cap dynamically using yfinance
-def get_top_15_stocks():
-    ticker_symbols = ['AAPL', 'MSFT', 'GOOGL', 'AMZN', 'TSLA', 'NVDA', 'META', 'BRK.B', 'V', 'JPM', 'JNJ', 'WMT', 'PG', 'DIS', 'MA']
-    stocks = yf.Tickers(ticker_symbols)
+# Fetch current holdings and exclude VOO and S&P 500 stocks
+def get_filtered_holdings():
+    # Fetch current positions from Robinhood
+    holdings = r.account.build_holdings()
     
-    stock_market_caps = {}
-    for symbol in ticker_symbols:
-        stock_info = stocks.tickers[symbol].info
-        stock_market_caps[symbol] = stock_info.get('marketCap', 0)
+    # List of S&P 500 stocks (this list can be updated as needed)
+    s_and_p_500_symbols = ['VOO']  # Add any other specific symbols you want to exclude
 
-    sorted_stocks = sorted(stock_market_caps.items(), key=lambda x: x[1], reverse=True)
-    top_15_stocks = [symbol for symbol, cap in sorted_stocks[:15]]
+    # Filter out stocks that are in VOO or the S&P 500
+    filtered_holdings = {symbol: details for symbol, details in holdings.items() if symbol not in s_and_p_500_symbols}
     
-    return top_15_stocks
+    return list(filtered_holdings.keys())
 
 # Check if the market is open (9:30 AM to 4:00 PM Eastern Time)
 def is_market_open():
@@ -130,10 +128,10 @@ def run_bot():
     logging.info(f"Initial account balance: ${initial_balance:.2f}")
     print(f"Initial account balance: ${initial_balance:.2f}")
 
-    # Fetch the top 15 stocks dynamically
-    top_15_stocks = get_top_15_stocks()
-    logging.info(f"Top 15 stocks by market cap: {top_15_stocks}")
-    print(f"Top 15 stocks by market cap: {top_15_stocks}")
+    # Fetch the filtered holdings dynamically (excluding VOO and S&P 500)
+    filtered_holdings = get_filtered_holdings()
+    logging.info(f"Filtered holdings (excluding VOO and S&P 500): {filtered_holdings}")
+    print(f"Filtered holdings (excluding VOO and S&P 500): {filtered_holdings}")
 
     # Set a loop limit for testing (for example, run for 3 cycles or you can modify this)
     cycles = 3
@@ -143,7 +141,7 @@ def run_bot():
 
             # Keep track of balance throughout the cycle
             total_spent = 0
-            for stock in top_15_stocks:
+            for stock in filtered_holdings:
                 if available_balance <= 0:
                     logging.info("Insufficient funds, stopping trades.")
                     print("Insufficient funds, stopping trades.")
